@@ -163,6 +163,8 @@ test('recall cancels on damage and returns the hero to the fountain after four s
 
 test('core protection, victory, rewards and returning to the lobby',async({page})=>{
   await start(page);
+  // LAN development over HTTP can lack crypto.randomUUID; getRandomValues still works.
+  await page.evaluate(()=>Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true}));
   const protection=await page.evaluate(()=>{
     const g=(window as any).__arena,core=g.entities.find((e:any)=>e.kind==='core'&&e.team===1),p=g.player;
     g.damage(core,500,p);const protectedHp=core.hp;
@@ -179,6 +181,8 @@ test('core protection, victory, rewards and returning to the lobby',async({page}
   await page.locator('#career').click();
   await expect(page.locator('.career-stats>div').nth(0)).toContainText('1');
   await expect(page.locator('.career-stats>div').nth(1)).toContainText('1');
+  await expect.poll(async()=>(await(await page.request.get('/api/player/me')).json()).player.matches).toBe(1);
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('vuong-gioi-match-outbox')||'[]').length)).toBe(0);
 });
 
 test('mobile layout, joystick and touch skills',async({browser})=>{

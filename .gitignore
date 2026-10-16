@@ -4,3 +4,7 @@ test-results/
 playwright-report/
 .DS_Store
 *.local
+.data/
+.env
+.env.*
+!.env.example

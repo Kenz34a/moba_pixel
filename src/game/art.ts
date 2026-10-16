@@ -16,7 +16,7 @@ const poly = (c:CanvasRenderingContext2D, pts:number[][], color:string) => {c.fi
 const portraits = new Map<string,string>();
 export function portrait(hero:HeroDef,skinIndex=0){
   skinIndex=Math.max(0,Math.min(hero.skins.length-1,skinIndex));
-  const key=hero.id+skinIndex;if(portraits.has(key))return portraits.get(key)!;
+  const palette=hero.skins[skinIndex];const key=hero.id+skinIndex+palette.primary+palette.secondary+palette.glow+palette.hair+palette.trim;if(portraits.has(key))return portraits.get(key)!;
   const canvas=document.createElement('canvas');canvas.width=144;canvas.height=152;
   const c=canvas.getContext('2d')!;c.imageSmoothingEnabled=false;const s=hero.skins[skinIndex];
   c.fillStyle=s.secondary;c.fillRect(0,0,144,152);

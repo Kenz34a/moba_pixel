@@ -323,12 +323,13 @@ function daQiao(p:PixelPainter,step:number,pose:number){
 
 const cache=new Map<string,HTMLCanvasElement>();
 export function heroSprite(c:CanvasRenderingContext2D,x:number,y:number,scale:number,hero:HeroDef,skin:Skin,time=0,faceDirection=1,action=0,walking=false){
-  const frame=walking?Math.floor(time*12)%8:0,pose=action>0?1:0,key=`${skin.model}:${frame}:${pose}`;
+  const frame=walking?Math.floor(time*12)%8:0,pose=action>0?1:0,key=`${skin.model}:${skin.primary}:${skin.secondary}:${skin.glow}:${skin.hair}:${skin.trim}:${frame}:${pose}`;
   let sprite=cache.get(key);
   if(!sprite){
     sprite=document.createElement('canvas');sprite.width=176;sprite.height=156;const ctx=sprite.getContext('2d')!;ctx.imageSmoothingEnabled=false;ctx.translate(83,130);
     const p=new PixelPainter(ctx,skin),step=walking?Math.round(Math.sin(frame/8*Math.PI*2)*2):0;
     switch(hero.id){case 'libai':liBai(p,step,pose);break;case 'diaochan':diaoChan(p,step,pose);break;case 'hanxin':hanXin(p,step,pose);break;case 'houyi':houYi(p,step,pose);break;case 'lvbu':lvBu(p,step,pose);break;case 'daqiao':daQiao(p,step,pose);break;}
+    if(cache.size>=384)cache.delete(cache.keys().next().value!);
     cache.set(key,sprite);
   }
   const bob=walking?Math.abs(Math.sin(time*12))*scale*.6:Math.sin(time*2.4)*scale*.35;

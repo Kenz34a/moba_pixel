@@ -4,7 +4,7 @@ Game MOBA pixel 5v5 chạy trực tiếp trên trình duyệt, với giao diện
 
 ## Chạy game
 
-Yêu cầu Node.js 20.19+ hoặc 22.12+. Môi trường cloud hiện dùng Node.js 24.
+Yêu cầu **Node.js 24 trở lên** để chạy API và SQLite tích hợp. Môi trường cloud đã có Node.js 24 và Chromium.
 
 ```sh
 npm ci
@@ -26,6 +26,48 @@ Trong môi trường cloud có thư mục home chỉ đọc, dùng `npm ci --cac
 - Cửa hàng sáu món có chỉ số thật, vàng, kinh nghiệm, cấp độ, hồi sinh, bảng điểm, bản đồ nhỏ và lịch sử hạ gục.
 - Điều khiển cảm ứng, âm thanh tổng hợp, tùy chọn rung màn hình, tạm dừng, màn hình kết quả và phần thưởng.
 - Thành tích, tướng, trang phục và cài đặt được lưu bằng `localStorage` trên từng trình duyệt.
+- Khi chạy cùng máy chủ Node, hồ sơ khách và kết quả trận được đồng bộ vào SQLite; tên, vàng, kinh nghiệm và trạng thái khóa do admin quản lý.
+
+## Quản trị
+
+Chạy trong thư mục dự án:
+
+```sh
+npm run admin:create
+npm run dev
+```
+
+Lệnh đầu yêu cầu tên đăng nhập và mật khẩu ít nhất 12 ký tự, có xác nhận. Mật khẩu được che khi nhập và lưu dưới dạng hash scrypt. Mở đường dẫn **`/admin`** trên cùng máy chủ để đăng nhập. Không có tài khoản hay mật khẩu mặc định.
+
+- **Tổng quan:** số hồ sơ, số trận, tỷ lệ thắng, trận gần đây và tướng được sử dụng, lấy từ dữ liệu đã lưu.
+- **Tướng:** sửa tên, mô tả, máu, công, tốc chạy, tầm đánh, chu kỳ đánh và hồi chiêu Q/E/R; bật hoặc tắt tướng cho người chơi lẫn bot.
+- **Trang phục:** sửa tên, mô tả, trạng thái và năm màu của từng bộ; xem trước trực tiếp trên Canvas. Tạo hình và vũ khí vẫn dùng 18 mẫu pixel của game.
+- **Người chơi:** tìm theo tên hoặc mã hồ sơ; đổi tên, vàng, kinh nghiệm, khóa/mở khóa kèm lý do. Hồ sơ bị khóa không ghi nhận trận hoặc nhận thưởng trên máy chủ.
+- **Cấu hình game:** vàng khởi đầu, chu kỳ lính, máu trụ/nhà chính, vàng hạ gục, phần thưởng; bật bảo trì và thông báo sảnh.
+- **Lịch sử thao tác và tài khoản:** xem người thực hiện, thời gian, nội dung thay đổi; đổi mật khẩu và đăng xuất.
+
+Cấu hình có hiệu lực khi người chơi **tải lại sảnh**. Chỉ số trận đang chạy giữ nguyên. Phần thưởng thực được tính theo cấu hình trên máy chủ lúc nhận kết quả. Mỗi mã trận chỉ được thưởng một lần; kết quả chưa gửi được sẽ xếp hàng thử lại. Hồ sơ được cập nhật khi tải trang hoặc quay lại cửa sổ sảnh. Luôn còn ít nhất một tướng và một trang phục cho mỗi tướng.
+
+Phiên admin dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; các thay đổi cần CSRF và kiểm tra nguồn yêu cầu. Đăng nhập sai nhiều lần bị giới hạn. Đổi hoặc đặt lại mật khẩu thu hồi mọi phiên của tài khoản đó. Lưu cấu hình/hồ sơ dùng kiểm tra phiên bản để tránh ghi đè thay đổi từ phiên khác.
+
+Nếu quên mật khẩu, chủ máy chủ chạy `npm run admin:create -- --username ten-admin --reset`. Có thể tạo thêm admin bằng cùng lệnh, với tên khác.
+
+Xem [giao diện đăng nhập](docs/admin-login.png) và [bảng quản lý tướng](docs/admin-console.png). Các ảnh được chụp từ bản production với cơ sở dữ liệu thử riêng.
+
+## Chạy production và lưu dữ liệu
+
+```sh
+npm ci
+npm run build
+npm run admin:create
+npm start
+```
+
+Máy chủ phục vụ game, `/admin` và `/api` cùng nguồn; mặc định cổng `5173`, địa chỉ lắng nghe `0.0.0.0`. Dùng `PORT` và `HOST` để đổi. Đặt sau HTTPS và bật `VG_COOKIE_SECURE=true` khi triển khai công khai. Chỉ chủ máy chủ truy cập terminal và thư mục dữ liệu.
+
+SQLite nằm trong **`.data/arena.sqlite`**, được giữ khi khởi động lại; thư mục và file có quyền hạn chế. Đặt `VG_DATA_DIR` nếu dùng ổ lưu trữ khác, và giữ nguyên đường dẫn cho cả máy chủ lẫn lệnh `admin:create`. Khi sao lưu, dừng máy chủ rồi sao chép **toàn bộ thư mục dữ liệu**, gồm các file WAL/SHM nếu có. `.data/`, `.env*`, mật khẩu và phiên đăng nhập không được đưa lên GitHub. Khi tự động hóa lần đầu, có thể cấp `VG_ADMIN_USERNAME` và `VG_ADMIN_PASSWORD` qua biến môi trường bí mật; chúng chỉ được dùng để tạo admin khi cơ sở dữ liệu chưa có admin.
+
+Hồ sơ người chơi hiện là **hồ sơ khách theo cookie của từng trình duyệt**, chưa có đăng nhập người chơi hoặc đồng bộ tài khoản giữa thiết bị. Xóa cookie làm mất quyền truy cập hồ sơ khách cũ. Lần đầu kết nối, game nhập thành tích cũ từ `localStorage`. Trận đấu vẫn mô phỏng trên trình duyệt và kết quả do trình duyệt gửi; chưa có máy chủ mô phỏng trận hoặc chống gian lận cho xếp hạng.
 
 ## Tướng và trang phục
 
@@ -64,13 +106,15 @@ Tạo hình được vẽ lại bằng Canvas pixel theo các đặc điểm nh�
 
 ```sh
 npm run build
-npm run preview
+npm start
 npm test
 ```
 
-`build` kiểm tra TypeScript rồi tạo `dist/`. Có thể phục vụ thư mục này trên dịch vụ lưu trữ tĩnh. Phông chữ được đóng gói tại chỗ, pixel art vẽ bằng Canvas, âm thanh tạo bằng Web Audio; trận đấu không tải tài nguyên từ CDN.
+`build` kiểm tra TypeScript rồi tạo `dist/`. `npm start` phục vụ bản production cùng API; `npm run preview` dùng Vite preview cùng API để kiểm tra cục bộ. Phục vụ `dist/` trên lưu trữ tĩnh vẫn chơi được với hồ sơ cục bộ, nhưng quản trị và đồng bộ SQLite cần máy chủ Node. Phông chữ được đóng gói tại chỗ, pixel art vẽ bằng Canvas, âm thanh tạo bằng Web Audio; trận đấu không tải tài nguyên từ CDN.
 
-Kiểm thử Playwright dùng Chromium ở `/usr/bin/chromium` trong môi trường cloud. Trên máy khác, truyền đường dẫn trình duyệt bằng `CHROMIUM_PATH=/path/to/chromium npm test`. Bộ 16 kiểm thử khởi động Vite nếu cần và kiểm tra chọn tướng/trang phục, 18 sprite có hình dáng khác nhau và vẽ đủ trong khung, chuyển hồ sơ cũ, trận 5v5, di chuyển, lính, tạm dừng, mua đồ, 18 kỹ năng, AI, hồi sinh, biến về, bảo hộ nhà chính, thắng trận, phần thưởng và cảm ứng.
+`npm test` chạy **7 kiểm thử backend và 23 kiểm thử trình duyệt**. Backend kiểm tra đăng nhập, thu hồi phiên, lưu SQLite qua kết nối mới, xác thực cấu hình, xung đột phiên bản, quản lý hồ sơ, thưởng một lần, CSRF, nguồn yêu cầu, giới hạn đăng nhập và CLI tạo admin. Trình duyệt kiểm tra toàn bộ màn hình admin, xem trước skin, cấu hình áp dụng vào trận, khóa hồ sơ, đổi mật khẩu, điện thoại và 16 kịch bản gameplay gồm cả 18 kỹ năng.
+
+Playwright dùng Chromium ở `/usr/bin/chromium`; trên máy khác, truyền `CHROMIUM_PATH=/path/to/chromium npm test`. Nó tự khởi động Vite ở cổng `5183` với SQLite riêng trong `/tmp/vg-e2e-*` và mật khẩu admin ngẫu nhiên, không dùng dữ liệu thật. Có thể chạy riêng backend bằng `npm run test:server`.
 
 ## Cấu trúc
 
@@ -81,6 +125,12 @@ Kiểm thử Playwright dùng Chromium ở `/usr/bin/chromium` trong môi trư�
 - `src/game/hero-art.ts`: 18 tạo hình pixel riêng, hoạt ảnh di chuyển/tấn công, đo khung và bộ nhớ đệm sprite.
 - `src/game/data.ts`: dữ liệu tướng, kỹ năng, trang phục và trang bị.
 - `src/game/audio.ts`: âm thanh Web Audio.
+- `src/game/runtime.ts`: nạp cấu hình, đồng bộ hồ sơ và hàng đợi gửi kết quả.
+- `src/admin/`: đăng nhập và bảng quản trị responsive.
+- `src/shared/config.ts`: kiểu dữ liệu và cấu hình mặc định dùng chung.
+- `server/`: API, xác thực, SQLite, phục vụ production và CLI tạo admin; không cần gói backend bên ngoài.
+- `vite.config.ts`: gắn API vào development và preview cùng cổng.
+- `tests/admin.spec.ts`, `tests/server.test.mjs`: kiểm thử quản trị và backend.
 - `tests/arena.spec.ts`: kiểm thử tích hợp trình duyệt. Inspector `window.__arena` chỉ có trong bản development.
 
-Bản hiện tại dành cho **một người chơi với AI**. Chơi mạng, tài khoản máy chủ và đồng bộ nhiều người chưa được triển khai. Tướng và trang phục là bản dựng pixel của nhân vật Vương Giả Vinh Diệu; chiến trường là bản đồ Thiên Vực của dự án. Giấy phép phông chữ nằm trong `public/licenses/`.
+Bản hiện tại dành cho **một người chơi với AI**, có quản trị trên máy chủ; chưa có đấu mạng nhiều người. Tướng và trang phục là bản dựng pixel của nhân vật Vương Giả Vinh Diệu; chiến trường là bản đồ Thiên Vực của dự án. Giấy phép phông chữ nằm trong `public/licenses/`.

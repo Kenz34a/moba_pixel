@@ -2,6 +2,7 @@ import { BASES, LANES, Point, WORLD, createTerrain } from './art';
 import { BOT_NAMES, HEROES, HeroId, ITEMS, heroById } from './data';
 import { audio } from './audio';
 import { GameRenderer } from './renderer';
+import { rules,roster,equippedSkin } from './runtime';
 
 export type Kind = 'hero'|'minion'|'tower'|'core'|'monster';
 export interface Entity extends Point {
@@ -35,18 +36,19 @@ export class Game {
     this.mode=mode;this.onEvent=onEvent;
     this.createStructures();
     this.player=this.createHero(hero,0,1,'Bạn',skin);
-    const allies=HEROES.filter(h=>h.id!==hero).slice(0,4);
-    const lanes=[0,2,0,2];allies.forEach((h,i)=>this.createHero(h.id,0,lanes[i],BOT_NAMES[i],0));
-    const enemyHeroes=HEROES.filter(h=>h.id!==allies[0].id).slice(0,5);
-    enemyHeroes.forEach((h,i)=>this.createHero(h.id,1,[0,1,2,0,2][i],BOT_NAMES[i+4],i%3));
+    const available=roster(),other=available.filter(h=>h.id!==hero),allyPool=other.length?other:[heroById(hero)];
+    const allies=Array.from({length:4},(_,i)=>allyPool[i%allyPool.length]);
+    const lanes=[0,2,0,2];allies.forEach((h,i)=>this.createHero(h.id,0,lanes[i],BOT_NAMES[i],equippedSkin(h,0)));
+    const enemyPool=available.filter(h=>h.id!==allies[0].id),pool=enemyPool.length?enemyPool:available;
+    Array.from({length:5},(_,i)=>pool[i%pool.length]).forEach((h,i)=>this.createHero(h.id,1,[0,1,2,0,2][i],BOT_NAMES[i+4],equippedSkin(h,i%3)));
     this.createCamps();
-    if(mode==='training'){for(let i=0;i<3;i++)this.levelUp(this.player,false);this.player.gold=2000;}
+    if(mode==='training'){for(let i=0;i<3;i++)this.levelUp(this.player,false);this.player.gold=rules.trainingGold;}
     this.renderer=new GameRenderer(this);this.bindInput();
     this.frame=requestAnimationFrame(this.loop);
   }
   private entity(p:Partial<Entity>&Pick<Entity,'kind'|'x'|'y'|'team'>){
     const e:Entity={id:nextId++,name:'',hp:100,maxHp:100,attack:20,range:70,speed:180,radius:18,
-      dead:false,respawn:0,cooldown:0,hero:'libai',skin:0,lane:1,pathIndex:0,tier:0,ranged:false,level:1,xp:0,gold:600,kills:0,deaths:0,assists:0,items:[],cd:[0,0,0],
+      dead:false,respawn:0,cooldown:0,hero:'libai',skin:0,lane:1,pathIndex:0,tier:0,ranged:false,level:1,xp:0,gold:rules.startingGold,kills:0,deaths:0,assists:0,items:[],cd:[0,0,0],
       shield:0,shieldTime:0,slow:0,stun:0,haste:0,lifesteal:0,boost:0,buff:0,moveTarget:null,focus:0,facing:1,anim:0,moving:0,aiTimer:0,home:{x:p.x,y:p.y},lastDamage:-100,hitBy:new Map(),recall:0,...p};
     this.entities.push(e);return e;
   }
@@ -55,15 +57,15 @@ export class Game {
     return this.entity({kind:'hero',team,x:b.x+(lane-1)*45,y:b.y+(lane-1)*35,name,hero:id,skin,lane,hp:h.hp,maxHp:h.hp,attack:h.attack,speed:h.speed,range:h.range,radius:23,pathIndex:team?LANES[lane].length-2:1});
   }
   private createStructures(){
-    BASES.forEach((p,team)=>this.entity({kind:'core',team,...p,name:'Nhà chính',hp:3800,maxHp:3800,attack:120,range:290,radius:65,speed:0}));
+    BASES.forEach((p,team)=>this.entity({kind:'core',team,...p,name:'Nhà chính',hp:rules.coreHp,maxHp:rules.coreHp,attack:120,range:290,radius:65,speed:0}));
     const towers=[
       {x:310,y:1880,lane:0,tier:1},{x:310,y:1000,lane:0,tier:2},
       {x:780,y:2220,lane:1,tier:1},{x:1190,y:1810,lane:1,tier:2},
       {x:1120,y:2690,lane:2,tier:1},{x:2000,y:2690,lane:2,tier:2}
     ];
     towers.forEach(t=>{
-      this.entity({...t,kind:'tower',team:0,name:'Trụ Ngọc',hp:1850,maxHp:1850,attack:170,range:320,radius:35,speed:0});
-      this.entity({...t,x:3000-t.x,y:3000-t.y,lane:t.lane===0?2:t.lane===2?0:1,kind:'tower',team:1,name:'Trụ Xích',hp:1850,maxHp:1850,attack:170,range:320,radius:35,speed:0});
+      this.entity({...t,kind:'tower',team:0,name:'Trụ Ngọc',hp:rules.towerHp,maxHp:rules.towerHp,attack:170,range:320,radius:35,speed:0});
+      this.entity({...t,x:3000-t.x,y:3000-t.y,lane:t.lane===0?2:t.lane===2?0:1,kind:'tower',team:1,name:'Trụ Xích',hp:rules.towerHp,maxHp:rules.towerHp,attack:170,range:320,radius:35,speed:0});
     });
   }
   private createCamps(){
@@ -135,7 +137,7 @@ export class Game {
     if(this.wave===1)this.announce('LÍNH ĐÃ XUẤT CHIẾN','Theo chân lính để tấn công trụ an toàn.',3);
   }
   private update(dt:number){
-    this.time+=dt;this.waveTime-=dt;if(this.waveTime<=0){this.waveTime=24;this.spawnWave();}
+    this.time+=dt;this.waveTime-=dt;if(this.waveTime<=0){this.waveTime=rules.waveInterval;this.spawnWave();}
     this.announcement.time=Math.max(0,this.announcement.time-dt);this.goldTick+=dt;
     if(this.goldTick>=1){this.goldTick--;for(const h of this.heroes){h.gold+=4;this.gainXP(h,4);}}
     this.shake=Math.max(0,this.shake-dt*15);
@@ -265,7 +267,7 @@ export class Game {
     this.emit(target.x,target.y-30,target.team===0?'#a1dfd2':'#f2b29d',target.kind==='tower'?50:25,160);
     if(target.kind==='hero'){
       target.deaths++;target.respawn=7+target.level*1.5;if(source.team>=0)this.score[source.team]++;
-      if(source.kind==='hero'){source.kills++;source.gold+=220;this.gainXP(source,130);}
+      if(source.kind==='hero'){source.kills++;source.gold+=rules.killGold;this.gainXP(source,130);}
       for(const h of this.heroes){if(h.id!==source.id&&h.team===source.team&&!h.dead&&(dist(h,target)<650||(target.hitBy.get(h.id)||-100)>this.time-8)){h.assists++;h.gold+=90;this.gainXP(h,70);}}
       this.logs.unshift({killer:source.kind==='hero'?heroById(source.hero).name:source.name,victim:heroById(target.hero).name,team:source.team,time:this.time,hero:source.kind==='hero'?source.hero:undefined});
       if(source===this.player){audio.play('kill');this.announce('HẠ GỤC!',heroById(target.hero).name+' đã bị đánh bại.',3,'kill');}
